@@ -31,6 +31,7 @@ type Options struct {
 	WSOrigin            string `hcl:"ws_origin" flagName:"ws-origin" flagDescribe:"A regular expression that matches origin URLs to be accepted by WebSocket. No cross origin requests are acceptable by default" default:""`
 	EnableWebGL         bool   `hcl:"enable_webgl" flagName:"enable-webgl" flagDescribe:"Enable WebGL renderer" default:"true"`
 	Quiet               bool   `hcl:"quiet" flagName:"quiet" flagDescribe:"Don't log" default:"false"`
+	AuditLogs           bool   `hcl:"audit" flagName:"audit" flagDescribe:"Print input output data" default:"false"`
 
 	TitleVariables map[string]interface{}
 }

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
@@ -153,6 +154,12 @@ func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn) e
 	}
 	if server.options.Height > 0 {
 		opts = append(opts, webtty.WithFixedRows(server.options.Height))
+	}
+	if server.options.EnableBasicAuth {
+		opts = append(opts, webtty.WithUsername(strings.Split(server.options.Credential, ":")[0]))
+	}
+	if server.options.AuditLogs {
+		opts = append(opts, webtty.WithAudit(true))
 	}
 	tty, err := webtty.New(&wsWrapper{conn}, slave, opts...)
 	if err != nil {

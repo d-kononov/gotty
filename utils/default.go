@@ -5,6 +5,8 @@ import (
 	"github.com/fatih/structs"
 	"reflect"
 	"strconv"
+	"strings"
+	"unicode"
 )
 
 func ApplyDefaultValues(struct_ interface{}) (err error) {
@@ -38,4 +40,13 @@ func ApplyDefaultValues(struct_ interface{}) (err error) {
 		field.Set(val)
 	}
 	return nil
+}
+
+func RemoveNonGraphicChar(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsGraphic(r) {
+			return r
+		}
+		return -1
+	}, s)
 }

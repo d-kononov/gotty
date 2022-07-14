@@ -1,12 +1,17 @@
 package webtty
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"sync"
 
+	"github.com/pborman/ansi"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/sorenisanerd/gotty/utils"
 )
 
 // WebTTY bridges a PTY slave and its PTY master.
@@ -18,16 +23,21 @@ type WebTTY struct {
 	// PTY Slave
 	slave Slave
 
-	windowTitle []byte
-	permitWrite bool
-	columns     int
-	rows        int
-	reconnect   int // in seconds
-	masterPrefs []byte
-	decoder     Decoder
+	windowTitle  []byte
+	permitWrite  bool
+	columns      int
+	rows         int
+	reconnect    int // in seconds
+	masterPrefs  []byte
+	username     string
+	auditEnabled bool
+	decoder      Decoder
 
 	bufferSize int
 	writeMutex sync.Mutex
+	feBuffer   []byte
+	beBuffer   []byte
+	logger     *zerolog.Logger
 }
 
 // New creates a new instance of WebTTY.
@@ -45,6 +55,7 @@ func New(masterConn Master, slave Slave, options ...Option) (*WebTTY, error) {
 
 		bufferSize: 1024,
 		decoder:    &NullCodec{},
+		logger:     &log.Logger,
 	}
 
 	for _, option := range options {
@@ -76,7 +87,7 @@ func (wt *WebTTY) Run(ctx context.Context) error {
 				if err != nil {
 					return ErrSlaveClosed
 				}
-
+				wt.auditLogs(buffer[:n], false)
 				err = wt.handleSlaveReadEvent(buffer[:n])
 				if err != nil {
 					return err
@@ -184,6 +195,7 @@ func (wt *WebTTY) handleMasterReadEvent(data []byte) error {
 			return errors.Wrapf(err, "failed to decode received data")
 		}
 
+		wt.auditLogs(decodedBuffer[:n], true)
 		_, err = wt.slave.Write(decodedBuffer[:n])
 		if err != nil {
 			return errors.Wrapf(err, "failed to write received data to slave")
@@ -238,4 +250,37 @@ func (wt *WebTTY) handleMasterReadEvent(data []byte) error {
 type argResizeTerminal struct {
 	Columns float64
 	Rows    float64
+}
+
+func (wt *WebTTY) auditLogs(buffer []byte, fromFe bool) {
+	if !wt.auditEnabled {
+		return
+	}
+	buffer, _ = ansi.Strip(buffer)
+	if fromFe {
+		wt.feBuffer = append(wt.feBuffer, buffer...)
+		if pos := bytes.LastIndexByte(wt.feBuffer, byte(13)); pos > -1 { // 13 = carriage return
+			wt.printAuditLogs(wt.feBuffer[:pos], fromFe)
+			wt.feBuffer = wt.feBuffer[pos+1:]
+		}
+	} else {
+		wt.beBuffer = append(wt.beBuffer, buffer...)
+		if pos := bytes.LastIndexByte(wt.beBuffer, byte(13)); pos > -1 { // 13 = carriage return
+			wt.printAuditLogs(wt.beBuffer[:pos], fromFe)
+			wt.beBuffer = wt.beBuffer[pos+1:]
+		}
+	}
+}
+
+func (wt *WebTTY) printAuditLogs(logs []byte, fe bool) {
+	stream := "browser"
+	if !fe {
+		stream = "backend"
+	}
+
+	logger := wt.logger.Info().Str("log-type", "audit").Str("stream", stream)
+	if wt.username != "" {
+		logger.Str("username", wt.username)
+	}
+	logger.Msg(utils.RemoveNonGraphicChar(string(logs)))
 }

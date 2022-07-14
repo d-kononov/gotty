@@ -60,3 +60,19 @@ func WithMasterPreferences(preferences interface{}) Option {
 		return nil
 	}
 }
+
+// WithUsername sets the UserName of the session
+func WithUsername(username string) Option {
+	return func(wt *WebTTY) error {
+		wt.username = username
+		return nil
+	}
+}
+
+// WithAudit sets Audit Enabled Logs variable
+func WithAudit(auditEnabled bool) Option {
+	return func(wt *WebTTY) error {
+		wt.auditEnabled = auditEnabled
+		return nil
+	}
+}
