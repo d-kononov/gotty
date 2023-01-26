@@ -4,7 +4,8 @@ COPY js /gotty/js
 COPY Makefile /gotty/
 RUN make bindata/static/js/gotty.js.map
 
-FROM golang:1.16 as go-build
+FROM golang:1.19-alpine as go-build
+RUN apk add --update nodejs npm make git
 WORKDIR /gotty
 COPY . /gotty
 COPY --from=js-build /gotty/js/node_modules /gotty/js/node_modules
