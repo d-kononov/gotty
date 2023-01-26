@@ -2,12 +2,20 @@ OUTPUT_DIR = ./builds
 GIT_COMMIT = `git rev-parse HEAD | cut -c1-7`
 VERSION = $(shell git describe --tags)
 BUILD_OPTIONS = -ldflags "-X main.Version=$(VERSION)"
-WEBPACK_MODE = production
+
+ifeq ($(DEV), 1)
+	BUILD_OPTIONS += -tags dev
+	WEBPACK_MODE = development
+else
+	WEBPACK_MODE = production
+endif
+
+export CGO_ENABLED=0
 
 gotty: main.go assets server/*.go webtty/*.go backend/*.go Makefile
 	go build ${BUILD_OPTIONS}
 
-docker: 
+docker:
 	docker build . -t gotty-bash:$(VERSION)
 
 .PHONY: all docker assets
@@ -54,8 +62,8 @@ README-options:
 	rm options.txt.tmp
 
 tools:
-	go get github.com/mitchellh/gox
-	go get github.com/tcnksm/ghr
+	go install github.com/mitchellh/gox@latest
+	go install github.com/tcnksm/ghr@latest
 
 test:
 	if [ `go fmt $(go list ./... | grep -v /vendor/) | wc -l` -gt 0 ]; then echo "go fmt error"; exit 1; fi
@@ -78,3 +86,7 @@ release:
 
 clean:
 	rm -fr gotty builds js/dist bindata/static js/node_modules
+
+addcontributors:
+	gh issue list -s all -L 1000 --json author -t "$$(echo '{{ range . }}{{ .author.login }}\n{{ end }}')" | sort | uniq | xargs -Ifoo all-contributors add foo bug --commitTemplate '<%= (newContributor ? "Add" : "Update") %> @<%= username %> as a contributor'
+	gh pr list -s all -L 1000 --json author -t "$$(echo '{{ range . }}{{ .author.login }}\n{{ end }}')" | sort | uniq | xargs -Ifoo all-contributors add foo code --commitTemplate '<%= (newContributor ? "Add" : "Update") %> @<%= username %> as a contributor'
